@@ -112,22 +112,21 @@ class ObstacleDetectionNode : public hobot::dnn_node::DnnNode {
 ObstacleDetectionNode::ObstacleDetectionNode(const std::string& node_name,
                              const rclcpp::NodeOptions& options)
     : hobot::dnn_node::DnnNode(node_name, options) {
+  
+  this->declare_parameter<std::string>("sub_img_topic", sub_img_topic_);
+  this->declare_parameter<std::string>("model_path", model_path_);
+  this->declare_parameter<bool>("is_shared_mem_sub", is_shared_mem_sub_);
+
+  this->get_parameter<std::string>("sub_img_topic", sub_img_topic_);
+  this->get_parameter<std::string>("model_path", model_path_);
+  this->get_parameter<bool>("is_shared_mem_sub", is_shared_mem_sub_);
+
   // Init中使用ObstacleDetectionNode子类实现的SetNodePara()方法进行算法推理的初始化
   if (Init() != 0 ||
       GetModelInputSize(0, model_input_width_, model_input_height_) < 0) {
     RCLCPP_ERROR(rclcpp::get_logger("ObstacleDetectionNode"), "Node init fail!");
     rclcpp::shutdown();
   }
-  
-  this->declare_parameter<std::string>("sub_img_topic", sub_img_topic_);
-  this->declare_parameter<std::string>("model_path", model_path_);
-  this->declare_parameter<bool>("is_shared_mem_sub_", is_shared_mem_sub_);
-
-  this->get_parameter<std::string>("sub_img_topic", sub_img_topic_);
-  this->get_parameter<std::string>("model_path", model_path_);
-  this->get_parameter<bool>("is_shared_mem_sub_", is_shared_mem_sub_);
-
-
 
   // 创建消息订阅者，从摄像头节点订阅图像消息
   if (is_shared_mem_sub_ == true){

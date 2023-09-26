@@ -99,16 +99,11 @@ def generate_launch_description():
             nv12_codec_node,
             # 启动算法pkg
             racing_obstacle_detection_yolov5_node,
-            # racing_track_detection_node,
-            # racing_control_node,
-            # 启动web展示pkg
             web_node
         ])
     else:
         return LaunchDescription([
             jpeg_codec_node,
-            racing_obstacle_detection_node,
-            # racing_track_detection_node,
-            # racing_control_node/
+            racing_obstacle_detection_yolov5_node
         ])
 
