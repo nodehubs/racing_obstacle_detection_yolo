@@ -20,6 +20,10 @@
 #include "hobot_cv/hobotcv_imgproc.h"
 #include "sensor_msgs/msg/image.hpp"
 
+#include "rapidjson/document.h"
+#include "rapidjson/istreamwrapper.h"
+#include "rapidjson/writer.h"
+
 #include "racing_obstacle_detection/parser.h"
 #include "racing_obstacle_detection/image_utils.h"
 
@@ -100,7 +104,7 @@ class ObstacleDetectionNode : public hobot::dnn_node::DnnNode {
       nullptr;
 
   std::string sub_img_topic_ = "/hbmem_img";
-  std::string model_path_ = "/opt/nodehub_model/race_detection/race_obstacle_detection.bin";
+  std::string config_file_ = "config/yolov5sconfig.json";
   bool is_shared_mem_sub_ = true;
   
 
@@ -114,11 +118,11 @@ ObstacleDetectionNode::ObstacleDetectionNode(const std::string& node_name,
     : hobot::dnn_node::DnnNode(node_name, options) {
   
   this->declare_parameter<std::string>("sub_img_topic", sub_img_topic_);
-  this->declare_parameter<std::string>("model_path", model_path_);
+  this->declare_parameter<std::string>("config_file", config_file_);
   this->declare_parameter<bool>("is_shared_mem_sub", is_shared_mem_sub_);
 
   this->get_parameter<std::string>("sub_img_topic", sub_img_topic_);
-  this->get_parameter<std::string>("model_path", model_path_);
+  this->get_parameter<std::string>("config_file", config_file_);
   this->get_parameter<bool>("is_shared_mem_sub", is_shared_mem_sub_);
 
   // Init中使用ObstacleDetectionNode子类实现的SetNodePara()方法进行算法推理的初始化
@@ -150,7 +154,28 @@ ObstacleDetectionNode::ObstacleDetectionNode(const std::string& node_name,
 int ObstacleDetectionNode::SetNodePara() {
   if (!dnn_node_para_ptr_) return -1;
   // 指定算法推理使用的模型文件路径
-  dnn_node_para_ptr_->model_file = model_path_;
+  std::ifstream ifs(config_file_.c_str());
+  if (!ifs) {
+    RCLCPP_ERROR(rclcpp::get_logger("SetNodePara"),
+                 "Read config file [%s] fail!",
+                 config_file_.data());
+    return -1;
+  }
+  rapidjson::IStreamWrapper isw(ifs);
+  rapidjson::Document document;
+  document.ParseStream(isw);
+  if (document.HasParseError()) {
+    RCLCPP_ERROR(rclcpp::get_logger("SetNodePara"),
+                 "Parsing config file %s failed",
+                 config_file_.data());
+    return -1;
+  }
+
+  std::string model_file;
+  if (document.HasMember("model_file")) {
+    model_file = document["model_file"].GetString();
+  }
+  dnn_node_para_ptr_->model_file = model_file;
   // 指定算法推理任务类型
   // 本示例使用的人体检测算法输入为单张图片，对应的算法推理任务类型为ModelInferType
   // 只有当算法输入为图片和roi（Region of
@@ -296,7 +321,7 @@ int ObstacleDetectionNode::PostProcess(
       results;
 
   // 3.2 开始解析
-  if (hobot::dnn_node::racing_obstacle_detection::Parse(node_output, results) < 0) {
+  if (hobot::dnn_node::racing_obstacle_detection::Parse(node_output, results, config_file_) < 0) {
     RCLCPP_ERROR(rclcpp::get_logger("ObstacleDetectionNode"),
                  "Parse node_output fail!");
     return -1;

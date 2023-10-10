@@ -66,7 +66,8 @@ struct YoloV5Result {
 //   - -1 失败
 int32_t Parse(
     const std::shared_ptr<hobot::dnn_node::DnnNodeOutput> &node_output,
-    std::vector<std::shared_ptr<YoloV5Result>> &results);
+    std::vector<std::shared_ptr<YoloV5Result>> &results,
+    const std::string &config_file);
 
 }  // namespace line_follower_detection
 }  // namespace dnn_node

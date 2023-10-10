@@ -87,7 +87,8 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {"is_shared_mem_sub": True},
-            {"sub_img_topic": "/hbmem_img"}
+            {"sub_img_topic": "/hbmem_img"},
+            {"config_file": "config/yolov5sconfig.json"},
         ],
         arguments=['--ros-args', '--log-level', 'warn']
     )

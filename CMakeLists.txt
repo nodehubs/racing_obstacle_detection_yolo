@@ -97,6 +97,11 @@ install(
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
+install(DIRECTORY
+  ${PROJECT_SOURCE_DIR}/config/
+  DESTINATION lib/${PROJECT_NAME}/config/
+)
+
 
 install(DIRECTORY
 ${PROJECT_SOURCE_DIR}/launch/

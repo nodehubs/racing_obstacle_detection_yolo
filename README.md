@@ -23,6 +23,7 @@ sudo apt install -y tros-racing-obstacle-detection-yolo
 
 ```shell
 source /opt/tros/local_setup.bash
+cp -r /opt/tros/lib/racing_obstacle_detection_yolo/config/ .
 ros2 launch racing_obstacle_detection_yolo racing_obstacle_detection_yolo.launch.py
 ```
 
@@ -52,7 +53,7 @@ ros2 launch racing_obstacle_detection_yolo racing_obstacle_detection_yolo.launch
 | --------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | sub_img_topic       | string |     接收的图片话题名称，请根据实际接收到的话题名称配置，默认值为/hbmem_img |
 | is_shared_mem_sub   | bool | 是否使用共享内存，请根据实际情况配置，默认值为True |
-| model_path   | string | 模型读取路径，请根据实际模型路径配置，默认值为/opt/nodehub_model/race_detection/race_obstacle_detection.bin |
+| config_file | string | 配置文件读取路径，请根据识别情况配置，默认值为config/yolov5sconfig.json |
 
 # 注意
 该功能包提供的模型仅用于gazebo仿真环境中的障碍物识别，若自行训练模型，请替换模型。
