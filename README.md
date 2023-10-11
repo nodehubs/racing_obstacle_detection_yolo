@@ -24,6 +24,11 @@ sudo apt install -y tros-racing-obstacle-detection-yolo
 ```shell
 source /opt/tros/local_setup.bash
 cp -r /opt/tros/lib/racing_obstacle_detection_yolo/config/ .
+
+# 仿真
+ros2 launch racing_obstacle_detection_yolo racing_obstacle_detection_yolo_simulation.launch.py
+
+# 实际场景
 ros2 launch racing_obstacle_detection_yolo racing_obstacle_detection_yolo.launch.py
 ```
 
