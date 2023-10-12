@@ -26,25 +26,12 @@ namespace hobot {
 namespace dnn_node {
 namespace racing_obstacle_detection {
 // 算法输出解析参数
-struct PTQYolo5Config {
-  std::vector<int> strides;
-  std::vector<std::vector<std::pair<double, double>>> anchors_table;
-  int class_num;
-  std::vector<std::string> class_names;
-  std::vector<std::vector<float>> dequantize_scale;
-};
-bool load_config = false;
+
 float score_threshold_ = 0.3;
 float nms_threshold_ = 0.65;
 int nms_top_k_ = 5000;
 
-PTQYolo5Config yolo5_config_ = {
-    {8, 16, 32},
-    {{{10, 13}, {16, 30}, {33, 23}},
-     {{30, 61}, {62, 45}, {59, 119}},
-     {{116, 90}, {156, 198}, {373, 326}}},
-    1,
-    {"construction_cone"}};
+
 
 void ParseTensor(std::shared_ptr<DNNTensor> tensor,
                  int layer,
@@ -72,15 +59,16 @@ inline size_t argmax(ForwardIterator first, ForwardIterator last) {
 
 void ParseTensor(std::shared_ptr<DNNTensor> tensor,
                  int layer,
-                 std::vector<YoloV5Result> &results) {
+                 std::vector<YoloV5Result> &results,
+                 PTQYolo5Config &yolo5_config) {
   hbSysFlushMem(&(tensor->sysMem[0]), HB_SYS_MEM_CACHE_INVALIDATE);
-  int num_classes = yolo5_config_.class_num;
-  int stride = yolo5_config_.strides[layer];
-  int num_pred = yolo5_config_.class_num + 4 + 1;
+  int num_classes = yolo5_config.class_num;
+  int stride = yolo5_config.strides[layer];
+  int num_pred = yolo5_config.class_num + 4 + 1;
 
-  std::vector<float> class_pred(yolo5_config_.class_num, 0.0);
+  std::vector<float> class_pred(yolo5_config.class_num, 0.0);
   std::vector<std::pair<double, double>> &anchors =
-      yolo5_config_.anchors_table[layer];
+      yolo5_config.anchors_table[layer];
 
   //  int *shape = tensor->data_shape.d;
   int height, width;
@@ -137,7 +125,7 @@ void ParseTensor(std::shared_ptr<DNNTensor> tensor,
           continue;
         }
         std::string name_conf = std::to_string(confidence);
-        name_conf = name_conf + yolo5_config_.class_names[static_cast<int>(id)];
+        name_conf = name_conf + yolo5_config.class_names[static_cast<int>(id)];
         results.emplace_back(
             YoloV5Result(static_cast<int>(id),
                          xmin,
@@ -145,88 +133,14 @@ void ParseTensor(std::shared_ptr<DNNTensor> tensor,
                          xmax,
                          ymax,
                          confidence,
-                         yolo5_config_.class_names[static_cast<int>(id)]));
+                         yolo5_config.class_names[static_cast<int>(id)]));
       }
       data = data + num_pred * anchors.size();
     }
   }
 }
 
-int InitClassNames(const std::string &cls_name_file) {
-  std::ifstream fi(cls_name_file);
-  if (fi) {
-    yolo5_config_.class_names.clear();
-    std::string line;
-    while (std::getline(fi, line)) {
-      yolo5_config_.class_names.push_back(line);
-    }
-    int size = yolo5_config_.class_names.size();
-    if(size != yolo5_config_.class_num){
-      RCLCPP_ERROR(rclcpp::get_logger("Yolo5_detection_parser"),
-                 "class_names length %d is not equal to class_num %d",
-                 size, yolo5_config_.class_num);
-      return -1;
-    }
-  } else {
-    RCLCPP_ERROR(rclcpp::get_logger("Yolo5_detection_parser"),
-                 "can not open cls name file: %s",
-                 cls_name_file.c_str());
-    return -1;
-  }
-  return 0;
-}
 
-int InitClassNum(const int &class_num) {
-  if(class_num > 0){
-    yolo5_config_.class_num = class_num;
-  } else {
-    RCLCPP_ERROR(rclcpp::get_logger("Yolo5_detection_parser"),
-                 "class_num = %d is not allowed, only support class_num > 0",
-                 class_num);
-    return -1;
-  }
-  return 0;
-}
-
-void LoadConfig(const std::string &config_file) {
-  if (config_file.empty()) {
-    RCLCPP_ERROR(rclcpp::get_logger("LoadConfig"),
-                 "Config file [%s] is empty!",
-                 config_file.data());
-    return;
-  }
-  // Parsing config
-  std::ifstream ifs(config_file.c_str());
-  if (!ifs) {
-    RCLCPP_ERROR(rclcpp::get_logger("LoadConfig"),
-                 "Read config file [%s] fail!",
-                 config_file.data());
-    return;
-  }
-  rapidjson::IStreamWrapper isw(ifs);
-  rapidjson::Document document;
-  document.ParseStream(isw);
-  if (document.HasParseError()) {
-    RCLCPP_ERROR(rclcpp::get_logger("LoadConfig"),
-                 "Parsing config file %s failed",
-                 config_file.data());
-    return;
-  }
-
-  if (document.HasMember("class_num")){
-    int class_num = document["class_num"].GetInt();
-    if (InitClassNum(class_num) < 0) {
-      return;
-    }
-  }
-  if (document.HasMember("cls_names_list")) {
-    std::string cls_name_file = document["cls_names_list"].GetString();
-    if (InitClassNames(cls_name_file) < 0) {
-      return;
-    }
-  }
-  return;
-}
 
 void yolo5_nms(std::vector<YoloV5Result> &input,
                float iou_threshold,
@@ -317,15 +231,11 @@ int get_tensor_hw(std::shared_ptr<DNNTensor> tensor, int *height, int *width) {
 int32_t Parse(
     const std::shared_ptr<hobot::dnn_node::DnnNodeOutput> &node_output,
     std::vector<std::shared_ptr<YoloV5Result>> &results,
-    const std::string &config_file) {
+    PTQYolo5Config &yolo5_config) {
   std::vector<YoloV5Result> parse_results;
-  if (load_config == false){
-    LoadConfig(config_file);
-    load_config = true;
-  }
   for (size_t i = 0; i < node_output->output_tensors.size(); i++) {
     ParseTensor(
-        node_output->output_tensors[i], static_cast<int>(i), parse_results);
+        node_output->output_tensors[i], static_cast<int>(i), parse_results,yolo5_config);
   }
   yolo5_nms(parse_results, nms_threshold_, nms_top_k_, results, false);
 

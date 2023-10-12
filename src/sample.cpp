@@ -71,6 +71,82 @@ int ResizeNV12Img(const char* in_img_data,
       src, in_img_height, in_img_width, out_img, resized_height, resized_width);
 }
 
+int InitClassNames(const std::string &cls_name_file,hobot::dnn_node::racing_obstacle_detection::PTQYolo5Config &yolo5_config) {
+  std::ifstream fi(cls_name_file);
+  if (fi) {
+    yolo5_config.class_names.clear();
+    std::string line;
+    while (std::getline(fi, line)) {
+      yolo5_config.class_names.push_back(line);
+    }
+    int size = yolo5_config.class_names.size();
+    if(size != yolo5_config.class_num){
+      RCLCPP_ERROR(rclcpp::get_logger("Yolo5_detection_parser"),
+                 "class_names length %d is not equal to class_num %d",
+                 size, yolo5_config.class_num);
+      return -1;
+    }
+  } else {
+    RCLCPP_ERROR(rclcpp::get_logger("Yolo5_detection_parser"),
+                 "can not open cls name file: %s",
+                 cls_name_file.c_str());
+    return -1;
+  }
+  return 0;
+}
+
+int InitClassNum(const int &class_num,hobot::dnn_node::racing_obstacle_detection::PTQYolo5Config &yolo5_config) {
+  if(class_num > 0){
+    yolo5_config.class_num = class_num;
+  } else {
+    RCLCPP_ERROR(rclcpp::get_logger("Yolo5_detection_parser"),
+                 "class_num = %d is not allowed, only support class_num > 0",
+                 class_num);
+    return -1;
+  }
+  return 0;
+}
+
+void LoadConfig(const std::string &config_file,hobot::dnn_node::racing_obstacle_detection::PTQYolo5Config &yolo5_config) {
+  if (config_file.empty()) {
+    RCLCPP_ERROR(rclcpp::get_logger("LoadConfig"),
+                 "Config file [%s] is empty!",
+                 config_file.data());
+    return;
+  }
+  // Parsing config
+  std::ifstream ifs(config_file.c_str());
+  if (!ifs) {
+    RCLCPP_ERROR(rclcpp::get_logger("LoadConfig"),
+                 "Read config file [%s] fail!",
+                 config_file.data());
+    return;
+  }
+  rapidjson::IStreamWrapper isw(ifs);
+  rapidjson::Document document;
+  document.ParseStream(isw);
+  if (document.HasParseError()) {
+    RCLCPP_ERROR(rclcpp::get_logger("LoadConfig"),
+                 "Parsing config file %s failed",
+                 config_file.data());
+    return;
+  }
+
+  if (document.HasMember("class_num")){
+    int class_num = document["class_num"].GetInt();
+    if (InitClassNum(class_num,yolo5_config) < 0) {
+      return;
+    }
+  }
+  if (document.HasMember("cls_names_list")) {
+    std::string cls_name_file = document["cls_names_list"].GetString();
+    if (InitClassNames(cls_name_file,yolo5_config) < 0) {
+      return;
+    }
+  }
+  return;
+}
+
 struct ObstacleDetectionNodeOutput : public hobot::dnn_node::DnnNodeOutput {
   // 缩放比例系数，原图和模型输入分辨率的比例。
   float ratio = 0.95238;
@@ -106,7 +182,14 @@ class ObstacleDetectionNode : public hobot::dnn_node::DnnNode {
   std::string sub_img_topic_ = "/hbmem_img";
   std::string config_file_ = "config/yolov5sconfig.json";
   bool is_shared_mem_sub_ = true;
-  
+
+  hobot::dnn_node::racing_obstacle_detection::PTQYolo5Config yolo5_config_ = {
+    {8, 16, 32},
+    {{{10, 13}, {16, 30}, {33, 23}},
+     {{30, 61}, {62, 45}, {59, 119}},
+     {{116, 90}, {156, 198}, {373, 326}}},
+    1,
+    {"construction_cone"}};
 
   // 图片消息订阅回调
   void FeedHbmImg(const hbm_img_msgs::msg::HbmMsg1080P::ConstSharedPtr msg);
@@ -131,7 +214,7 @@ ObstacleDetectionNode::ObstacleDetectionNode(const std::string& node_name,
     RCLCPP_ERROR(rclcpp::get_logger("ObstacleDetectionNode"), "Node init fail!");
     rclcpp::shutdown();
   }
-
+  LoadConfig(config_file_,yolo5_config_);
   // 创建消息订阅者，从摄像头节点订阅图像消息
   if (is_shared_mem_sub_ == true){
     hbm_img_subscription_ =
@@ -321,7 +404,7 @@ int ObstacleDetectionNode::PostProcess(
       results;
 
   // 3.2 开始解析
-  if (hobot::dnn_node::racing_obstacle_detection::Parse(node_output, results, config_file_) < 0) {
+  if (hobot::dnn_node::racing_obstacle_detection::Parse(node_output, results, yolo5_config_) < 0) {
     RCLCPP_ERROR(rclcpp::get_logger("ObstacleDetectionNode"),
                  "Parse node_output fail!");
     return -1;

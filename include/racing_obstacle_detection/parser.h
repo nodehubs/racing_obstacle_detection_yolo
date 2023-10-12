@@ -54,6 +54,14 @@ struct YoloV5Result {
   }
 };
 
+struct PTQYolo5Config {
+  std::vector<int> strides;
+  std::vector<std::vector<std::pair<double, double>>> anchors_table;
+  int class_num;
+  std::vector<std::string> class_names;
+  std::vector<std::vector<float>> dequantize_scale;
+};
+
 // 自定义的算法输出解析方法
 // - 参数
 //   - [in] node_output dnn node输出，包含算法推理输出
@@ -67,7 +75,8 @@ struct YoloV5Result {
 int32_t Parse(
     const std::shared_ptr<hobot::dnn_node::DnnNodeOutput> &node_output,
     std::vector<std::shared_ptr<YoloV5Result>> &results,
-    const std::string &config_file);
+    PTQYolo5Config &yolo5_config);
+
 
 }  // namespace line_follower_detection
 }  // namespace dnn_node
