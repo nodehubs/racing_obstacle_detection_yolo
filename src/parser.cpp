@@ -33,7 +33,7 @@ struct PTQYolo5Config {
   std::vector<std::string> class_names;
   std::vector<std::vector<float>> dequantize_scale;
 };
-
+bool load_config = false;
 float score_threshold_ = 0.3;
 float nms_threshold_ = 0.65;
 int nms_top_k_ = 5000;
@@ -319,7 +319,10 @@ int32_t Parse(
     std::vector<std::shared_ptr<YoloV5Result>> &results,
     const std::string &config_file) {
   std::vector<YoloV5Result> parse_results;
-  LoadConfig(config_file);
+  if (load_config == false){
+    LoadConfig(config_file);
+    load_config = true;
+  }
   for (size_t i = 0; i < node_output->output_tensors.size(); i++) {
     ParseTensor(
         node_output->output_tensors[i], static_cast<int>(i), parse_results);
