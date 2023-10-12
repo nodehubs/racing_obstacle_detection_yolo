@@ -268,7 +268,7 @@ int ObstacleDetectionNode::SetNodePara() {
   // 指定算法推理使用的任务数量，YOLOv5算法推理耗时较长，指定使用4个任务进行推理
   dnn_node_para_ptr_->task_num = 2;
   // 不通过bpu_core_ids参数指定算法推理使用的BPU核，使用负载均衡模式
-  dnn_node_para_ptr_->bpu_core_ids = hobot::dnn_node::BPUCoreIDType::BPU_CORE_0;
+  dnn_node_para_ptr_->bpu_core_ids.push_back(hobot::dnn_node::BPUCoreIDType::BPU_CORE_0);
   return 0;
 }
 
