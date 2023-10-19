@@ -180,7 +180,7 @@ class ObstacleDetectionNode : public hobot::dnn_node::DnnNode {
       nullptr;
 
   std::string sub_img_topic_ = "/hbmem_img";
-  std::string config_file_ = "config/yolov5sconfig.json";
+  std::string config_file_ = "config/yolov5sconfig_simulation.json";
   bool is_shared_mem_sub_ = true;
 
   hobot::dnn_node::racing_obstacle_detection::PTQYolo5Config yolo5_config_ = {
